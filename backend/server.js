@@ -16,21 +16,6 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgres://album:album@localhost:5432/album',
 });
 
-await pool.query(`
-  CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    username TEXT UNIQUE NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-  );
-  CREATE TABLE IF NOT EXISTS stickers (
-    user_id INTEGER PRIMARY KEY REFERENCES users(id),
-    owned JSONB NOT NULL DEFAULT '[]',
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-  );
-`);
-
 const app = express();
 app.use(express.json({ limit: '1mb' }));
 
@@ -92,17 +77,19 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 app.get('/api/stickers', auth, async (req, res) => {
-  const { rows } = await pool.query('SELECT owned FROM stickers WHERE user_id = $1', [req.user.id]);
-  res.json({ owned: rows[0]?.owned ?? [] });
+  const { rows } = await pool.query('SELECT owned, repeats FROM stickers WHERE user_id = $1', [req.user.id]);
+  res.json({ owned: rows[0]?.owned ?? [], repeats: rows[0]?.repeats ?? {} });
 });
 
 app.put('/api/stickers', auth, async (req, res) => {
-  const { owned } = req.body ?? {};
+  const { owned, repeats } = req.body ?? {};
   if (!Array.isArray(owned)) return res.status(400).json({ error: 'Formato inválido' });
+  if (typeof repeats !== 'object' || Array.isArray(repeats) || repeats === null)
+    return res.status(400).json({ error: 'Formato inválido' });
   await pool.query(
-    `INSERT INTO stickers (user_id, owned) VALUES ($1, $2)
-     ON CONFLICT (user_id) DO UPDATE SET owned = $2, updated_at = NOW()`,
-    [req.user.id, JSON.stringify(owned)]
+    `INSERT INTO stickers (user_id, owned, repeats) VALUES ($1, $2, $3)
+     ON CONFLICT (user_id) DO UPDATE SET owned = $2, repeats = $3, updated_at = NOW()`,
+    [req.user.id, JSON.stringify(owned), JSON.stringify(repeats)]
   );
   res.json({ ok: true });
 });
