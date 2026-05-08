@@ -5,12 +5,12 @@ import { getUsername, clearToken, clearUsername, fetchStickers } from './api.js'
 
 export default function App() {
   const [username, setUsername] = useState(getUsername);
-  const [initialOwned, setInitialOwned] = useState(null);
+  const [initialData, setInitialData] = useState(null);
 
   useEffect(() => {
     if (!username) return;
     fetchStickers()
-      .then((data) => setInitialOwned(new Set(data.owned)))
+      .then((data) => setInitialData({ owned: new Set(data.owned), repeats: data.repeats ?? {} }))
       .catch(() => {
         clearToken();
         clearUsername();
@@ -20,21 +20,21 @@ export default function App() {
 
   const handleAuth = (u) => {
     setUsername(u);
-    setInitialOwned(null);
+    setInitialData(null);
   };
 
   const handleLogout = () => {
     clearToken();
     clearUsername();
     setUsername(null);
-    setInitialOwned(null);
+    setInitialData(null);
   };
 
   if (!username) return <Auth onAuth={handleAuth} />;
 
-  if (initialOwned === null) return <Loading />;
+  if (initialData === null) return <Loading />;
 
-  return <AlbumApp username={username} initialOwned={initialOwned} onLogout={handleLogout} />;
+  return <AlbumApp username={username} initialOwned={initialData.owned} initialRepeats={initialData.repeats} onLogout={handleLogout} />;
 }
 
 function Loading() {

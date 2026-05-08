@@ -28,5 +28,5 @@ export const register = (username, email, password) =>
 
 export const fetchStickers = () => req('/api/stickers');
 
-export const saveStickers = (owned) =>
-  req('/api/stickers', { method: 'PUT', body: JSON.stringify({ owned }) });
+export const saveStickers = (owned, repeats) =>
+  req('/api/stickers', { method: 'PUT', body: JSON.stringify({ owned, repeats }) });
