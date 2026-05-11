@@ -30,3 +30,13 @@ export const fetchStickers = () => req('/api/stickers');
 
 export const saveStickers = (owned, repeats) =>
   req('/api/stickers', { method: 'PUT', body: JSON.stringify({ owned, repeats }) });
+
+export const createShareLink = () =>
+  req('/api/share/repeats', { method: 'POST' });
+
+export const getSharedRepeats = async (shareId) => {
+  const res = await fetch(`/api/share/${shareId}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+};

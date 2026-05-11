@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { saveStickers } from './api.js';
+import { saveStickers, createShareLink } from './api.js';
 import { SECTIONS, TOTAL } from './stickers.js';
 
 export default function AlbumApp({ username, initialOwned, initialRepeats, onLogout }) {
@@ -8,6 +8,9 @@ export default function AlbumApp({ username, initialOwned, initialRepeats, onLog
   const [tab, setTab] = useState("album");
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [shareLink, setShareLink] = useState(null);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareError, setShareError] = useState(null);
   const saveTimer = useRef(null);
 
   useEffect(() => {
@@ -70,6 +73,32 @@ export default function AlbumApp({ username, initialOwned, initialRepeats, onLog
       setOwned(new Set());
       setRepeats({});
     }
+  };
+
+  const generateShareLink = async () => {
+    setShareLoading(true);
+    setShareError(null);
+    try {
+      const { shareId } = await createShareLink();
+      const fullUrl = `${window.location.origin}/share/${shareId}`;
+      setShareLink(fullUrl);
+    } catch (e) {
+      setShareError(e.message);
+    } finally {
+      setShareLoading(false);
+    }
+  };
+
+  const copyShareLink = () => {
+    if (shareLink) {
+      navigator.clipboard.writeText(shareLink);
+      alert('¡Link copiado al portapapeles! 📋');
+    }
+  };
+
+  const closeShareModal = () => {
+    setShareLink(null);
+    setShareError(null);
   };
 
   const visibleSections = useMemo(() => {
@@ -256,7 +285,16 @@ export default function AlbumApp({ username, initialOwned, initialRepeats, onLog
             <>
               <div style={s.repeatsHeader}>
                 <span style={s.repeatsHeaderText}>🔁 Repetidas</span>
-                <span style={s.repeatsCount}>{totalExtraCount} extra{totalExtraCount !== 1 ? 's' : ''}</span>
+                <div style={s.repeatsActions}>
+                  <span style={s.repeatsCount}>{totalExtraCount} extra{totalExtraCount !== 1 ? 's' : ''}</span>
+                  <button 
+                    style={s.shareBtn} 
+                    onClick={generateShareLink}
+                    disabled={shareLoading}
+                  >
+                    {shareLoading ? '⏳' : '🔗'} Compartir
+                  </button>
+                </div>
               </div>
               {repeatsBySection.map((sec) => (
                 <div key={sec.id} style={s.section}>
@@ -284,6 +322,53 @@ export default function AlbumApp({ username, initialOwned, initialRepeats, onLog
               ))}
             </>
           )}
+        </div>
+      )}
+
+      {shareLink && (
+        <div style={s.modalOverlay} onClick={closeShareModal}>
+          <div style={s.modal} onClick={(e) => e.stopPropagation()}>
+            <div style={s.modalHeader}>
+              <h3 style={s.modalTitle}>🔗 Link para Compartir</h3>
+              <button style={s.modalClose} onClick={closeShareModal}>×</button>
+            </div>
+            <p style={s.modalText}>Compartí este link con tus amigos para mostrarles tus estampas repetidas:</p>
+            <div style={s.linkBox}>
+              <input 
+                type="text" 
+                value={shareLink} 
+                readOnly 
+                style={s.linkInput}
+                onClick={(e) => e.target.select()}
+              />
+            </div>
+            <div style={s.modalActions}>
+              <button style={s.copyBtn} onClick={copyShareLink}>
+                📋 Copiar Link
+              </button>
+              <button style={s.closeBtn} onClick={closeShareModal}>
+                Cerrar
+              </button>
+            </div>
+            <p style={s.modalNote}>
+              💡 El link expira en 30 días
+            </p>
+          </div>
+        </div>
+      )}
+
+      {shareError && (
+        <div style={s.modalOverlay} onClick={() => setShareError(null)}>
+          <div style={s.modal} onClick={(e) => e.stopPropagation()}>
+            <div style={s.modalHeader}>
+              <h3 style={s.modalTitle}>⚠️ Error</h3>
+              <button style={s.modalClose} onClick={() => setShareError(null)}>×</button>
+            </div>
+            <p style={s.errorText}>{shareError}</p>
+            <button style={s.closeBtn} onClick={() => setShareError(null)}>
+              Cerrar
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -513,5 +598,127 @@ const s = {
     background: "none", border: "none", cursor: "pointer",
     color: "#475569", fontSize: 14, lineHeight: 1, padding: "0 0 0 2px",
     fontWeight: 700,
+  },
+
+  // Share functionality
+  repeatsActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+  },
+  shareBtn: {
+    fontSize: 11,
+    fontWeight: 700,
+    cursor: "pointer",
+    padding: "4px 10px",
+    borderRadius: 8,
+    background: "rgba(59,130,246,0.2)",
+    border: "1px solid rgba(59,130,246,0.4)",
+    color: "#93c5fd",
+  },
+
+  // Modal
+  modalOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: "rgba(0,0,0,0.75)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+    zIndex: 1000,
+  },
+  modal: {
+    background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)",
+    border: "1px solid rgba(99,102,241,0.3)",
+    borderRadius: 16,
+    padding: 24,
+    maxWidth: 500,
+    width: "100%",
+  },
+  modalHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  modalTitle: {
+    margin: 0,
+    fontSize: 20,
+    fontWeight: 700,
+    color: "#e2e8f0",
+  },
+  modalClose: {
+    background: "none",
+    border: "none",
+    color: "#94a3b8",
+    fontSize: 28,
+    lineHeight: 1,
+    cursor: "pointer",
+    padding: 0,
+    width: 32,
+    height: 32,
+  },
+  modalText: {
+    margin: "0 0 16px",
+    fontSize: 14,
+    color: "#cbd5e1",
+    lineHeight: 1.5,
+  },
+  linkBox: {
+    marginBottom: 16,
+  },
+  linkInput: {
+    width: "100%",
+    padding: "12px",
+    borderRadius: 8,
+    border: "1px solid rgba(99,102,241,0.3)",
+    background: "rgba(15,23,42,0.6)",
+    color: "#e2e8f0",
+    fontSize: 13,
+    fontFamily: "monospace",
+    outline: "none",
+  },
+  modalActions: {
+    display: "flex",
+    gap: 10,
+    marginBottom: 12,
+  },
+  copyBtn: {
+    flex: 1,
+    padding: "10px 16px",
+    borderRadius: 8,
+    border: "none",
+    background: "linear-gradient(135deg, #6366f1, #a855f7)",
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  closeBtn: {
+    flex: 1,
+    padding: "10px 16px",
+    borderRadius: 8,
+    border: "1px solid rgba(255,255,255,0.2)",
+    background: "rgba(255,255,255,0.1)",
+    color: "#e2e8f0",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  modalNote: {
+    margin: 0,
+    fontSize: 12,
+    color: "#64748b",
+    textAlign: "center",
+  },
+  errorText: {
+    margin: "0 0 16px",
+    fontSize: 14,
+    color: "#fca5a5",
+    lineHeight: 1.5,
   },
 };

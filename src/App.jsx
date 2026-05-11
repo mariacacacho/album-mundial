@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react';
 import Auth from './Auth.jsx';
 import AlbumApp from './AlbumApp.jsx';
+import SharedRepeats from './SharedRepeats.jsx';
 import { getUsername, clearToken, clearUsername, fetchStickers } from './api.js';
 
 export default function App() {
   const [username, setUsername] = useState(getUsername);
   const [initialData, setInitialData] = useState(null);
 
+  // Check if viewing a shared link
+  const path = window.location.pathname;
+  const shareMatch = path.match(/^\/share\/([a-f0-9]+)$/);
+  const shareId = shareMatch ? shareMatch[1] : null;
+
   useEffect(() => {
-    if (!username) return;
+    if (!username || shareId) return;
     fetchStickers()
       .then((data) => setInitialData({ owned: new Set(data.owned), repeats: data.repeats ?? {} }))
       .catch(() => {
@@ -16,7 +22,7 @@ export default function App() {
         clearUsername();
         setUsername(null);
       });
-  }, [username]);
+  }, [username, shareId]);
 
   const handleAuth = (u) => {
     setUsername(u);
@@ -29,6 +35,15 @@ export default function App() {
     setUsername(null);
     setInitialData(null);
   };
+
+  const handleBackFromShare = () => {
+    window.location.href = '/';
+  };
+
+  // If viewing a shared link
+  if (shareId) {
+    return <SharedRepeats shareId={shareId} onBack={username ? handleBackFromShare : null} />;
+  }
 
   if (!username) return <Auth onAuth={handleAuth} />;
 
