@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync } from 'fs';
+import crypto from 'crypto';
 
 const { Pool } = pg;
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -92,6 +93,72 @@ app.put('/api/stickers', auth, async (req, res) => {
     [req.user.id, JSON.stringify(owned), JSON.stringify(repeats)]
   );
   res.json({ ok: true });
+});
+
+// Generate shareable link for repeated stickers
+app.post('/api/share/repeats', auth, async (req, res) => {
+  try {
+    // Get current repeats
+    const { rows } = await pool.query('SELECT repeats FROM stickers WHERE user_id = $1', [req.user.id]);
+    const repeats = rows[0]?.repeats ?? {};
+    
+    // Filter out only repeats with count > 0
+    const validRepeats = Object.entries(repeats)
+      .filter(([, count]) => count > 0)
+      .reduce((acc, [id, count]) => ({ ...acc, [id]: count }), {});
+    
+    if (Object.keys(validRepeats).length === 0) {
+      return res.status(400).json({ error: 'No tenés estampas repetidas para compartir' });
+    }
+    
+    // Generate unique ID
+    const shareId = crypto.randomBytes(8).toString('hex');
+    
+    // Set expiration to 30 days from now
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    
+    // Store in database
+    await pool.query(
+      `INSERT INTO shared_links (id, user_id, username, repeats, expires_at) 
+       VALUES ($1, $2, $3, $4, $5)`,
+      [shareId, req.user.id, req.user.username, JSON.stringify(validRepeats), expiresAt]
+    );
+    
+    res.json({ shareId, expiresAt });
+  } catch (e) {
+    console.error('Error creating share link:', e);
+    res.status(500).json({ error: 'Error al crear el link para compartir' });
+  }
+});
+
+// Get shared repeats (public endpoint, no auth required)
+app.get('/api/share/:shareId', async (req, res) => {
+  try {
+    const { shareId } = req.params;
+    
+    const { rows } = await pool.query(
+      `SELECT username, repeats, created_at, expires_at 
+       FROM shared_links 
+       WHERE id = $1 AND (expires_at IS NULL OR expires_at > NOW())`,
+      [shareId]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Link no encontrado o expirado' });
+    }
+    
+    const { username, repeats, created_at, expires_at } = rows[0];
+    
+    res.json({
+      username,
+      repeats,
+      createdAt: created_at,
+      expiresAt: expires_at
+    });
+  } catch (e) {
+    console.error('Error fetching shared link:', e);
+    res.status(500).json({ error: 'Error al obtener el link compartido' });
+  }
 });
 
 app.use((req, res) => {
