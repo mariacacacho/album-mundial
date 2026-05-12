@@ -103,7 +103,9 @@ export default function SharedRepeats({ shareId, onBack }) {
               <div key={sec.id} style={s.section}>
                 <div style={s.sectionHeader}>
                   <div style={s.sectionInfo}>
-                    <span style={s.sectionEmoji}>{sec.emoji}</span>
+                    {sec.iso
+                      ? <span className={`fi fi-${sec.iso}`} style={s.sectionFlag} />
+                      : <span style={s.sectionEmoji}>{sec.emoji}</span>}
                     <span style={s.sectionName}>{sec.name}</span>
                   </div>
                 </div>
@@ -244,6 +246,7 @@ const s = {
   },
   sectionInfo: { display: "flex", alignItems: "center", gap: 8, minWidth: 0 },
   sectionEmoji: { fontSize: 20, flexShrink: 0 },
+  sectionFlag: { width: 20, height: 15, flexShrink: 0, borderRadius: 2 },
   sectionName: {
     fontSize: 14,
     fontWeight: 700,

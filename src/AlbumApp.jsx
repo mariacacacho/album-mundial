@@ -218,7 +218,9 @@ export default function AlbumApp({ username, initialOwned, initialRepeats, onLog
                 <div key={sec.id} style={s.section}>
                   <div style={s.sectionHeader}>
                     <div style={s.sectionInfo}>
-                      <span style={s.sectionEmoji}>{sec.emoji}</span>
+                      {sec.iso
+                        ? <span className={`fi fi-${sec.iso}`} style={s.sectionFlag} />
+                        : <span style={s.sectionEmoji}>{sec.emoji}</span>}
                       <span style={s.sectionName}>{sec.name}</span>
                       <span style={{ ...s.sectionCount, ...(complete ? s.sectionCountDone : {}) }}>
                         {sectionOwned}/{sec.stickers.length}
@@ -300,7 +302,9 @@ export default function AlbumApp({ username, initialOwned, initialRepeats, onLog
                 <div key={sec.id} style={s.section}>
                   <div style={s.sectionHeader}>
                     <div style={s.sectionInfo}>
-                      <span style={s.sectionEmoji}>{sec.emoji}</span>
+                      {sec.iso
+                        ? <span className={`fi fi-${sec.iso}`} style={s.sectionFlag} />
+                        : <span style={s.sectionEmoji}>{sec.emoji}</span>}
                       <span style={s.sectionName}>{sec.name}</span>
                     </div>
                   </div>
@@ -473,6 +477,7 @@ const s = {
   },
   sectionInfo: { display: "flex", alignItems: "center", gap: 8, minWidth: 0 },
   sectionEmoji: { fontSize: 20, flexShrink: 0 },
+  sectionFlag: { width: 20, height: 15, flexShrink: 0, borderRadius: 2 },
   sectionName: { fontSize: 14, fontWeight: 700, color: "#e2e8f0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
   sectionCount: { fontSize: 12, color: "#64748b", fontWeight: 600, flexShrink: 0 },
   sectionCountDone: { color: "#86efac" },
