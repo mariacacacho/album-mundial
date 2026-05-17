@@ -131,27 +131,53 @@ app.post('/api/share/repeats', auth, async (req, res) => {
   }
 });
 
-// Get shared repeats (public endpoint, no auth required)
+// Generate shareable link for missing stickers
+app.post('/api/share/missing', auth, async (req, res) => {
+  try {
+    const { missing } = req.body ?? {};
+    if (!Array.isArray(missing) || missing.length === 0) {
+      return res.status(400).json({ error: 'No tenés estampas faltantes para compartir' });
+    }
+
+    const shareId = crypto.randomBytes(8).toString('hex');
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    await pool.query(
+      `INSERT INTO shared_links (id, user_id, username, type, repeats, missing, expires_at)
+       VALUES ($1, $2, $3, 'missing', '{}', $4, $5)`,
+      [shareId, req.user.id, req.user.username, JSON.stringify(missing), expiresAt]
+    );
+
+    res.json({ shareId, expiresAt });
+  } catch (e) {
+    console.error('Error creating missing share link:', e);
+    res.status(500).json({ error: 'Error al crear el link para compartir' });
+  }
+});
+
+// Get shared stickers (public endpoint, no auth required)
 app.get('/api/share/:shareId', async (req, res) => {
   try {
     const { shareId } = req.params;
-    
+
     const { rows } = await pool.query(
-      `SELECT username, repeats, created_at, expires_at 
-       FROM shared_links 
+      `SELECT username, type, repeats, missing, created_at, expires_at
+       FROM shared_links
        WHERE id = $1 AND (expires_at IS NULL OR expires_at > NOW())`,
       [shareId]
     );
-    
+
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Link no encontrado o expirado' });
     }
-    
-    const { username, repeats, created_at, expires_at } = rows[0];
-    
+
+    const { username, type, repeats, missing, created_at, expires_at } = rows[0];
+
     res.json({
       username,
+      type: type || 'repeats',
       repeats,
+      missing,
       createdAt: created_at,
       expiresAt: expires_at
     });

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { saveStickers, createShareLink } from './api.js';
+import { saveStickers, createShareLink, createShareMissingLink } from './api.js';
 import { SECTIONS, TOTAL } from './stickers.js';
 
 export default function AlbumApp({ username, initialOwned, initialRepeats, onLogout }) {
@@ -9,6 +9,7 @@ export default function AlbumApp({ username, initialOwned, initialRepeats, onLog
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [shareLink, setShareLink] = useState(null);
+  const [shareType, setShareType] = useState('repeats');
   const [shareLoading, setShareLoading] = useState(false);
   const [shareError, setShareError] = useState(null);
   const saveTimer = useRef(null);
@@ -78,8 +79,26 @@ export default function AlbumApp({ username, initialOwned, initialRepeats, onLog
   const generateShareLink = async () => {
     setShareLoading(true);
     setShareError(null);
+    setShareType('repeats');
     try {
       const { shareId } = await createShareLink();
+      const fullUrl = `${window.location.origin}/share/${shareId}`;
+      setShareLink(fullUrl);
+    } catch (e) {
+      setShareError(e.message);
+    } finally {
+      setShareLoading(false);
+    }
+  };
+
+  const generateShareMissingLink = async () => {
+    setShareLoading(true);
+    setShareError(null);
+    setShareType('missing');
+    try {
+      const allStickers = SECTIONS.flatMap((sec) => sec.stickers);
+      const missingIds = allStickers.filter((id) => !owned.has(id));
+      const { shareId } = await createShareMissingLink(missingIds);
       const fullUrl = `${window.location.origin}/share/${shareId}`;
       setShareLink(fullUrl);
     } catch (e) {
@@ -207,6 +226,17 @@ export default function AlbumApp({ username, initialOwned, initialRepeats, onLog
               <span style={{ ...s.statNum, color: "#f87171" }}>{TOTAL - owned.size}</span>
               <span style={s.statLabel}>Faltan</span>
             </div>
+            <button
+              style={s.shareMissingBtn}
+              onClick={generateShareMissingLink}
+              disabled={shareLoading || owned.size === TOTAL}
+              title="Compartir mis estampas faltantes"
+            >
+              <span style={s.shareMissingIcon}>
+                {shareLoading && shareType === 'missing' ? '⏳' : '🔗'}
+              </span>
+              <span style={s.statLabel}>Compartir faltantes</span>
+            </button>
             <button style={s.resetBtn} onClick={resetAll}>Reiniciar</button>
           </div>
 
@@ -336,7 +366,11 @@ export default function AlbumApp({ username, initialOwned, initialRepeats, onLog
               <h3 style={s.modalTitle}>🔗 Link para Compartir</h3>
               <button style={s.modalClose} onClick={closeShareModal}>×</button>
             </div>
-            <p style={s.modalText}>Compartí este link con tus amigos para mostrarles tus estampas repetidas:</p>
+            <p style={s.modalText}>
+              {shareType === 'missing'
+                ? 'Compartí este link con tus amigos para mostrarles tus estampas faltantes:'
+                : 'Compartí este link con tus amigos para mostrarles tus estampas repetidas:'}
+            </p>
             <div style={s.linkBox}>
               <input 
                 type="text" 
@@ -620,6 +654,23 @@ const s = {
     background: "rgba(59,130,246,0.2)",
     border: "1px solid rgba(59,130,246,0.4)",
     color: "#93c5fd",
+  },
+  shareMissingBtn: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    background: "rgba(255,255,255,0.05)",
+    border: "1px solid rgba(255,255,255,0.09)",
+    borderRadius: 12,
+    padding: "10px 0",
+    cursor: "pointer",
+  },
+  shareMissingIcon: {
+    display: "block",
+    fontSize: 22,
+    lineHeight: 1.2,
+    fontWeight: 800,
   },
 
   // Modal

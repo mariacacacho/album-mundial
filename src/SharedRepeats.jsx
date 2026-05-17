@@ -22,20 +22,35 @@ export default function SharedRepeats({ shareId, onBack }) {
     loadSharedData();
   }, [shareId]);
 
-  const repeatsBySection = useMemo(() => {
-    if (!data?.repeats) return [];
-    const repeats = data.repeats;
+  const isMissing = data?.type === 'missing';
+
+  const sectionItems = useMemo(() => {
+    if (!data) return [];
+    if (isMissing) {
+      const missingSet = new Set(data.missing ?? []);
+      return SECTIONS
+        .map((sec) => {
+          const items = sec.stickers.filter((id) => missingSet.has(id));
+          return items.length > 0 ? { ...sec, items } : null;
+        })
+        .filter(Boolean);
+    }
+    const repeats = data.repeats ?? {};
     return SECTIONS
       .map((sec) => {
         const items = sec.stickers.filter((id) => repeats[id] > 0);
         return items.length > 0 ? { ...sec, items } : null;
       })
       .filter(Boolean);
-  }, [data]);
+  }, [data, isMissing]);
 
   const totalExtraCount = useMemo(() => {
     if (!data?.repeats) return 0;
     return Object.values(data.repeats).reduce((sum, c) => sum + c, 0);
+  }, [data]);
+
+  const totalMissingCount = useMemo(() => {
+    return data?.missing?.length ?? 0;
   }, [data]);
 
   if (loading) {
@@ -69,8 +84,8 @@ export default function SharedRepeats({ shareId, onBack }) {
   return (
     <div style={s.root}>
       <header style={s.header}>
-        <div style={s.trophy}>🔁</div>
-        <h1 style={s.title}>Estampas Repetidas</h1>
+        <div style={s.trophy}>{isMissing ? '❌' : '🔁'}</div>
+        <h1 style={s.title}>{isMissing ? 'Estampas Faltantes' : 'Estampas Repetidas'}</h1>
         <p style={s.subtitle}>Compartidas por {data.username}</p>
         {onBack && (
           <button style={s.backBtn} onClick={onBack}>
@@ -85,21 +100,43 @@ export default function SharedRepeats({ shareId, onBack }) {
           <span style={s.infoValue}>{data.username}</span>
         </div>
         <div style={s.infoRow}>
-          <span style={s.infoLabel}>🔁 Total de extras:</span>
-          <span style={s.infoValue}>{totalExtraCount}</span>
+          {isMissing ? (
+            <>
+              <span style={s.infoLabel}>❌ Total faltantes:</span>
+              <span style={s.infoValue}>{totalMissingCount}</span>
+            </>
+          ) : (
+            <>
+              <span style={s.infoLabel}>🔁 Total de extras:</span>
+              <span style={s.infoValue}>{totalExtraCount}</span>
+            </>
+          )}
         </div>
       </div>
 
       <div style={s.sections}>
-        {repeatsBySection.length === 0 ? (
-          <div style={s.empty}>No hay estampas repetidas disponibles 🤷</div>
+        {sectionItems.length === 0 ? (
+          <div style={s.empty}>
+            {isMissing ? '¡No faltan estampas! Álbum completo 🏆' : 'No hay estampas repetidas disponibles 🤷'}
+          </div>
         ) : (
           <>
             <div style={s.repeatsHeader}>
-              <span style={s.repeatsHeaderText}>🔁 Repetidas Disponibles</span>
-              <span style={s.repeatsCount}>{totalExtraCount} extra{totalExtraCount !== 1 ? 's' : ''}</span>
+              {isMissing ? (
+                <>
+                  <span style={{ ...s.repeatsHeaderText, color: '#f87171' }}>❌ Estampas Faltantes</span>
+                  <span style={{ ...s.repeatsCount, color: '#991b1b', background: 'rgba(248,113,113,0.15)' }}>
+                    {totalMissingCount} faltante{totalMissingCount !== 1 ? 's' : ''}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span style={s.repeatsHeaderText}>🔁 Repetidas Disponibles</span>
+                  <span style={s.repeatsCount}>{totalExtraCount} extra{totalExtraCount !== 1 ? 's' : ''}</span>
+                </>
+              )}
             </div>
-            {repeatsBySection.map((sec) => (
+            {sectionItems.map((sec) => (
               <div key={sec.id} style={s.section}>
                 <div style={s.sectionHeader}>
                   <div style={s.sectionInfo}>
@@ -110,15 +147,18 @@ export default function SharedRepeats({ shareId, onBack }) {
                   </div>
                 </div>
                 <div style={s.repeatsChips}>
-                  {sec.items.map((id) => {
-                    const extra = data.repeats[id];
-                    return (
+                  {sec.items.map((id) => (
+                    isMissing ? (
+                      <div key={id} style={{ ...s.chip, ...s.chipMissing }}>
+                        <span style={{ ...s.chipId, color: '#fca5a5' }}>{id}</span>
+                      </div>
+                    ) : (
                       <div key={id} style={s.chip}>
                         <span style={s.chipId}>{id}</span>
-                        <span style={s.chipCount}>×{extra + 1}</span>
+                        <span style={s.chipCount}>×{data.repeats[id] + 1}</span>
                       </div>
-                    );
-                  })}
+                    )
+                  ))}
                 </div>
               </div>
             ))}
@@ -283,4 +323,8 @@ const s = {
   },
   chipId: { fontSize: 12, fontWeight: 700, color: "#a5b4fc" },
   chipCount: { fontSize: 12, color: "#c7d2fe", fontWeight: 700 },
+  chipMissing: {
+    background: "rgba(248,113,113,0.1)",
+    border: "1px solid rgba(248,113,113,0.25)",
+  },
 };

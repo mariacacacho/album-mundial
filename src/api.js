@@ -34,6 +34,9 @@ export const saveStickers = (owned, repeats) =>
 export const createShareLink = () =>
   req('/api/share/repeats', { method: 'POST' });
 
+export const createShareMissingLink = (missing) =>
+  req('/api/share/missing', { method: 'POST', body: JSON.stringify({ missing }) });
+
 export const getSharedRepeats = async (shareId) => {
   const res = await fetch(`/api/share/${shareId}`);
   const data = await res.json();
